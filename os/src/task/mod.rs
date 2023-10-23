@@ -23,6 +23,10 @@ pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
 
+use crate::syscall::TaskInfo;
+
+use crate::timer::get_time_ms;
+
 /// The task manager, where all the tasks are managed.
 ///
 /// Functions implemented on `TaskManager` deals with all task state transitions
@@ -54,6 +58,8 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_times: [0; 5],
+            start_time: 0,
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +141,41 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn count_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+
+        match syscall_id {
+            64 => current_tcb.syscall_times[0] += 1,
+            93 => current_tcb.syscall_times[1] += 1,
+            124 => current_tcb.syscall_times[2] += 1,
+            169 => current_tcb.syscall_times[3] += 1,
+            410 => current_tcb.syscall_times[4] += 1,
+            _ => {}
+        }
+    }
+
+    fn set_task_info(&self, task_info: *mut TaskInfo) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+
+        let curr_time = get_time_ms();
+
+        unsafe {
+            (*task_info).time = curr_time - current_tcb.start_time;
+
+            (*task_info).syscall_times[64] = current_tcb.syscall_times[0];
+            (*task_info).syscall_times[93] = current_tcb.syscall_times[1];
+            (*task_info).syscall_times[124] = current_tcb.syscall_times[2];
+            (*task_info).syscall_times[169] = current_tcb.syscall_times[3];
+            (*task_info).syscall_times[410] = current_tcb.syscall_times[4];
+
+            (*task_info).status = TaskStatus::Running;
+        }
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +209,14 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Count syscall times
+pub fn count_syscall(syscall_id: usize) {
+    TASK_MANAGER.count_syscall(syscall_id);
+}
+
+/// Set TaskInfo
+pub fn set_task_info(task_info: *mut TaskInfo) {
+    TASK_MANAGER.set_task_info(task_info);
 }

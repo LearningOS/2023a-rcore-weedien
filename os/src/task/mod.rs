@@ -15,7 +15,9 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::VirtPageNum;
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -23,6 +25,8 @@ use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
+
+use crate::syscall::TaskInfo;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -80,6 +84,8 @@ impl TaskManager {
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
+        next_task.start_time = get_time_ms();
+
         drop(inner);
         let mut _unused = TaskContext::zero_init();
         // before this, we should drop local variables that must be dropped manually
@@ -143,6 +149,12 @@ impl TaskManager {
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
+            let next_task_tcb = &mut inner.tasks[next];
+
+            if next_task_tcb.start_time == 0 {
+                next_task_tcb.start_time = get_time_ms();
+            }
+
             drop(inner);
             // before this, we should drop local variables that must be dropped manually
             unsafe {
@@ -152,6 +164,57 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+
+    fn count_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+
+        match syscall_id {
+            64 => current_tcb.syscall_times[0] += 1,
+            93 => current_tcb.syscall_times[1] += 1,
+            124 => current_tcb.syscall_times[2] += 1,
+            169 => current_tcb.syscall_times[3] += 1,
+            410 => current_tcb.syscall_times[4] += 1,
+            _ => {}
+        }
+    }
+
+    fn set_task_info(&self, task_info: *mut TaskInfo) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+
+        let curr_time = get_time_ms();
+
+        unsafe {
+            (*task_info).time = curr_time - current_tcb.start_time;
+
+            (*task_info).syscall_times[64] = current_tcb.syscall_times[0];
+            (*task_info).syscall_times[93] = current_tcb.syscall_times[1];
+            (*task_info).syscall_times[124] = current_tcb.syscall_times[2];
+            (*task_info).syscall_times[169] = current_tcb.syscall_times[3];
+            (*task_info).syscall_times[410] = current_tcb.syscall_times[4];
+
+            (*task_info).status = TaskStatus::Running;
+        }
+    }
+
+    /// mmap
+    pub fn mmap(&self, start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+        current_tcb.memory_set.mmap(start, end, port)
+    }
+
+    /// mumap
+    pub fn mumap(&self, start: VirtPageNum, end: VirtPageNum) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_tcb = &mut inner.tasks[current];
+        current_tcb.memory_set.mumap(start, end)
     }
 }
 
@@ -201,4 +264,24 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Count syscall times with syscall_id
+pub fn count_syscall(syscall_id: usize) {
+    TASK_MANAGER.count_syscall(syscall_id);
+}
+
+/// Set task_info of current 'Running' task
+pub fn set_task_info(task_info: *mut TaskInfo) {
+    TASK_MANAGER.set_task_info(task_info);
+}
+
+/// Allocate memory for current 'Running' task
+pub fn mmap(start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
+    TASK_MANAGER.mmap(start, end, port)
+}
+
+/// Free memory
+pub fn mumap(start: VirtPageNum, end: VirtPageNum) -> isize {
+    TASK_MANAGER.mumap(start, end)
 }

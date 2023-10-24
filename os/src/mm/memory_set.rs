@@ -37,6 +37,7 @@ lazy_static! {
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
+    mmap_frames: BTreeMap<VirtPageNum, FrameTracker>,
 }
 
 impl MemorySet {
@@ -45,6 +46,7 @@ impl MemorySet {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
+            mmap_frames: BTreeMap::new(),
         }
     }
     /// Get the page table token
@@ -261,6 +263,54 @@ impl MemorySet {
         } else {
             false
         }
+    }
+
+    /// mmap
+    pub fn mmap(&mut self, start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
+        let mut flags = match port & 7 {
+            1 => PTEFlags::R,
+            2 => PTEFlags::W,
+            4 => PTEFlags::X,
+            _ => PTEFlags::empty(),
+        };
+        flags |= PTEFlags::U | PTEFlags::V;
+
+        let mut start = start;
+
+        loop {
+            let pte = self.page_table.translate(start).unwrap();
+            if pte.is_valid() {
+                return -1;
+            }
+            let frame = frame_alloc().unwrap();
+            let ppn = frame.ppn;
+            self.page_table.map(start, ppn, flags);
+            self.mmap_frames.insert(start, frame);
+            start.step();
+
+            if start >= end {
+                break;
+            }
+        }
+        0
+    }
+
+    /// mumap
+    pub fn mumap(&mut self, start: VirtPageNum, end: VirtPageNum) -> isize {
+        let mut start = start;
+        loop {
+            let pte = self.page_table.translate(start).unwrap();
+            if !pte.is_valid() {
+                return -1;
+            }
+            self.page_table.unmap(start);
+            self.mmap_frames.remove(&start);
+            start.step();
+            if start >= end {
+                break;
+            }
+        }
+        0
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory

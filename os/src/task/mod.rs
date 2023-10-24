@@ -17,7 +17,7 @@ mod task;
 use crate::loader::{get_app_data, get_num_app};
 use crate::mm::VirtPageNum;
 use crate::sync::UPSafeCell;
-use crate::timer::get_time_ms;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -84,7 +84,7 @@ impl TaskManager {
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
-        next_task.start_time = get_time_ms();
+        next_task.start_time = get_time_us() / 1000;
 
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -152,7 +152,7 @@ impl TaskManager {
             let next_task_tcb = &mut inner.tasks[next];
 
             if next_task_tcb.start_time == 0 {
-                next_task_tcb.start_time = get_time_ms();
+                next_task_tcb.start_time = get_time_us() / 1000;
             }
 
             drop(inner);
@@ -186,7 +186,7 @@ impl TaskManager {
         let current = inner.current_task;
         let current_tcb = &mut inner.tasks[current];
 
-        let curr_time = get_time_ms();
+        let curr_time = get_time_us() / 1000;
 
         unsafe {
             (*task_info).time = curr_time - current_tcb.start_time;

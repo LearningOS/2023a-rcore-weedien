@@ -132,6 +132,6 @@ pub fn munmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
     let code = task
         .inner_exclusive_access()
         .memory_set
-        .mumap(start_vpn, end_vpn);
+        .munmap(start_vpn, end_vpn);
     code
 }

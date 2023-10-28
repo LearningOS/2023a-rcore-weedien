@@ -304,62 +304,55 @@ impl MemorySet {
     }
 
     /// mmap
-    pub fn mmap(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum, port: usize) -> isize {
-        let mut flags = PTEFlags::empty();
-        let mut vpn = start_vpn;
+    pub fn mmap(&mut self, start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
+        let mut flags = match port & 7 {
+            1 => PTEFlags::R,
+            2 => PTEFlags::W,
+            4 => PTEFlags::X,
+            _ => PTEFlags::empty(),
+        };
+        flags |= PTEFlags::U | PTEFlags::V;
 
-        if port & 0b0000_0001 != 0 {
-            flags |= PTEFlags::R;
-        }
+        let mut start = start;
 
-        if port & 0b0000_0010 != 0 {
-            flags |= PTEFlags::W;
-        }
-
-        if port & 0b0000_0100 != 0 {
-            flags |= PTEFlags::X;
-        }
-
-        flags |= PTEFlags::U;
-        flags |= PTEFlags::V;
-
-        while vpn != end_vpn {
-            if let Some(pte) = self.page_table.translate(vpn) {
-                debug!("find vpn {:?} pte flag = {:?}", vpn, pte.flags());
+        loop {
+            if let Some(pte) = self.page_table.translate(start) {
                 if pte.is_valid() {
-                    debug!("map on already mapped vpn {:?}", vpn);
                     return -1;
                 }
             }
             if let Some(frame) = frame_alloc() {
                 let ppn = frame.ppn;
-                debug!(" map vpn {:?} and ppn {:?} flag {:?}", vpn, ppn, flags);
-                self.page_table.map(vpn, ppn, flags);
-                self.mmap_frames.insert(vpn, frame);
+                self.page_table.map(start, ppn, flags);
+                self.mmap_frames.insert(start, frame);
             } else {
                 return -1;
             }
-            vpn.step();
+            start.step();
+            if start >= end {
+                break;
+            }
         }
-
         0
     }
 
-    /// mmunmap
-    pub fn munmap(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
-        let mut vpn = start_vpn;
-        while vpn != end_vpn {
-            if let Some(pte) = self.page_table.translate(vpn) {
+    /// munmap
+    pub fn munmap(&mut self, start: VirtPageNum, end: VirtPageNum) -> isize {
+        let mut start = start;
+        loop {
+            if let Some(pte) = self.page_table.translate(start) {
                 if !pte.is_valid() {
-                    debug!("unmap on no map vpn");
                     return -1;
                 }
             } else {
                 return -1;
             }
-            self.page_table.unmap(vpn);
-            self.mmap_frames.remove(&vpn);
-            vpn.step();
+            self.page_table.unmap(start);
+            self.mmap_frames.remove(&start);
+            start.step();
+            if start >= end {
+                break;
+            }
         }
         0
     }

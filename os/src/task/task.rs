@@ -70,7 +70,7 @@ pub struct TaskControlBlockInner {
     pub program_brk: usize,
 
     /// schedule priority
-    pub priority: u8,
+    pub priority: u32,
 
     /// stride
     pub stride: u32,

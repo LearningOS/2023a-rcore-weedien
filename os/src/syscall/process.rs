@@ -151,7 +151,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     0
 }
 
-/// YOUR JOB: Implement mmap.
+// YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
@@ -174,7 +174,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     mmap(start_vpn, end_vpn, port)
 }
 
-/// YOUR JOB: Implement munmap.
+// YOUR JOB: Implement munmap.
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",

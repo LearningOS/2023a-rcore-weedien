@@ -305,12 +305,18 @@ impl MemorySet {
 
     /// mmap
     pub fn mmap(&mut self, start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
-        let mut flags = match port & 7 {
-            1 => PTEFlags::R,
-            2 => PTEFlags::W,
-            4 => PTEFlags::X,
-            _ => PTEFlags::empty(),
-        };
+        let mut flags = PTEFlags::empty();
+
+        if port & 1 != 0 {
+            flags |= PTEFlags::R;
+        }
+        if port & 2 != 0 {
+            flags |= PTEFlags::W;
+        }
+        if port & 4 != 0 {
+            flags |= PTEFlags::X;
+        }
+
         flags |= PTEFlags::U | PTEFlags::V;
 
         let mut start = start;
@@ -328,7 +334,9 @@ impl MemorySet {
             } else {
                 return -1;
             }
+
             start.step();
+
             if start >= end {
                 break;
             }
@@ -336,7 +344,7 @@ impl MemorySet {
         0
     }
 
-    /// munmap
+    /// mumap
     pub fn munmap(&mut self, start: VirtPageNum, end: VirtPageNum) -> isize {
         let mut start = start;
         loop {
@@ -347,6 +355,7 @@ impl MemorySet {
             } else {
                 return -1;
             }
+
             self.page_table.unmap(start);
             self.mmap_frames.remove(&start);
             start.step();

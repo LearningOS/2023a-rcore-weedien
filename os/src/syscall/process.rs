@@ -7,7 +7,7 @@ use crate::{
     mm::{translate_ptr, translated_refmut, translated_str, VirtAddr, VirtPageNum},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next, mmap, munmap,
-        suspend_current_and_run_next, TaskControlBlock, TaskStatus,
+        set_task_info, suspend_current_and_run_next, TaskControlBlock, TaskStatus,
     },
     timer::get_time_us,
 };
@@ -23,11 +23,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 /// task exits and submit an exit code
@@ -141,12 +141,14 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!(
         "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let kti = translate_ptr(current_user_token(), ti);
+    set_task_info(kti);
+    0
 }
 
 /// YOUR JOB: Implement mmap.

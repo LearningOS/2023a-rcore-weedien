@@ -10,6 +10,8 @@ use super::{TaskContext, TaskControlBlock};
 use crate::config::BIG_STRIDE;
 use crate::mm::VirtPageNum;
 use crate::sync::UPSafeCell;
+use crate::syscall::TaskInfo;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -63,6 +65,10 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+
+            if task_inner.start_time == 0 {
+                task_inner.start_time = get_time_us() / 1000;
+            }
 
             // when the task is scheduled, add pass value to stride
             task_inner.stride += BIG_STRIDE / task_inner.priority;
@@ -134,4 +140,39 @@ pub fn munmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
         .memory_set
         .munmap(start_vpn, end_vpn);
     code
+}
+
+/// count syscall times
+pub fn count_syscall(syscall_id: usize) {
+    let task = current_task().unwrap();
+    let mut current_tcb = task.inner_exclusive_access();
+
+    match syscall_id {
+        64 => current_tcb.syscall_times[0] += 1,
+        93 => current_tcb.syscall_times[1] += 1,
+        124 => current_tcb.syscall_times[2] += 1,
+        169 => current_tcb.syscall_times[3] += 1,
+        410 => current_tcb.syscall_times[4] += 1,
+        _ => {}
+    }
+}
+
+/// set task info
+pub fn set_task_info(task_info: *mut TaskInfo) {
+    let task = current_task().unwrap();
+    let current_tcb = task.inner_exclusive_access();
+
+    let curr_time = get_time_us() / 1000;
+
+    unsafe {
+        (*task_info).time = curr_time - current_tcb.start_time;
+
+        (*task_info).syscall_times[64] = current_tcb.syscall_times[0];
+        (*task_info).syscall_times[93] = current_tcb.syscall_times[1];
+        (*task_info).syscall_times[124] = current_tcb.syscall_times[2];
+        (*task_info).syscall_times[169] = current_tcb.syscall_times[3];
+        (*task_info).syscall_times[410] = current_tcb.syscall_times[4];
+
+        (*task_info).status = TaskStatus::Running;
+    }
 }

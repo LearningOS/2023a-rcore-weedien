@@ -213,7 +213,7 @@ impl Inode {
 
     /// unlink
     pub fn unlink(&self, name: &str) -> isize {
-        self.fs.lock();
+        let mut _fs = self.fs.lock();
         self.modify_disk_inode(|root_inode| {
             let file_count = (root_inode.size as usize) / DIRENT_SZ;
             let mut dirent = DirEntry::empty();

@@ -40,6 +40,7 @@ pub fn kernel_token() -> usize {
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
+    mmap_frames: BTreeMap<VirtPageNum, FrameTracker>,
 }
 
 impl MemorySet {
@@ -48,6 +49,7 @@ impl MemorySet {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
+            mmap_frames: BTreeMap::new(),
         }
     }
     /// Get the page table token
@@ -317,6 +319,69 @@ impl MemorySet {
         } else {
             false
         }
+    }
+
+    /// mmap
+    pub fn mmap(&mut self, start: VirtPageNum, end: VirtPageNum, port: usize) -> isize {
+        let mut flags = PTEFlags::empty();
+
+        if port & 1 != 0 {
+            flags |= PTEFlags::R;
+        }
+        if port & 2 != 0 {
+            flags |= PTEFlags::W;
+        }
+        if port & 4 != 0 {
+            flags |= PTEFlags::X;
+        }
+
+        flags |= PTEFlags::U | PTEFlags::V;
+
+        let mut start = start;
+
+        loop {
+            if let Some(pte) = self.page_table.translate(start) {
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+            if let Some(frame) = frame_alloc() {
+                let ppn = frame.ppn;
+                self.page_table.map(start, ppn, flags);
+                self.mmap_frames.insert(start, frame);
+            } else {
+                return -1;
+            }
+
+            start.step();
+
+            if start >= end {
+                break;
+            }
+        }
+        0
+    }
+
+    /// mumap
+    pub fn munmap(&mut self, start: VirtPageNum, end: VirtPageNum) -> isize {
+        let mut start = start;
+        loop {
+            if let Some(pte) = self.page_table.translate(start) {
+                if !pte.is_valid() {
+                    return -1;
+                }
+            } else {
+                return -1;
+            }
+
+            self.page_table.unmap(start);
+            self.mmap_frames.remove(&start);
+            start.step();
+            if start >= end {
+                break;
+            }
+        }
+        0
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory

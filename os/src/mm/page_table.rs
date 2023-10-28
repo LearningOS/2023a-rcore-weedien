@@ -276,3 +276,17 @@ impl Iterator for UserBufferIterator {
         }
     }
 }
+
+/// Translate virtal address to physical address with given token
+pub fn translate_ptr<T>(token: usize, ptr: *const T) -> *mut T {
+    let page_table: PageTable = PageTable::from_token(token);
+
+    let start_va = VirtAddr::from(ptr as usize);
+    let vpn = start_va.floor();
+    let ppn: PhysAddr = page_table.translate(vpn).unwrap().ppn().into();
+
+    let offset = start_va.page_offset();
+    let pa: usize = ppn.into();
+
+    (pa + offset) as *mut T
+}

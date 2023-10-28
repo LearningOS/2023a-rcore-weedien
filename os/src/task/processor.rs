@@ -65,7 +65,7 @@ pub fn run_tasks() {
             task_inner.task_status = TaskStatus::Running;
 
             // when the task is scheduled, add pass value to stride
-            task_inner.stride += BIG_STRIDE / task_inner.priority;
+            task_inner.stride += BIG_STRIDE / task_inner.priority as u32;
 
             // release coming task_inner manually
             drop(task_inner);

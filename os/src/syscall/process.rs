@@ -240,6 +240,7 @@ pub fn sys_set_priority(prio: isize) -> isize {
         let current_task = current_task().unwrap();
         let mut inner = current_task.inner_exclusive_access();
         inner.priority = prio as u8;
+        drop(inner);
 
         return prio;
     }

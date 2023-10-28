@@ -23,7 +23,29 @@ impl TaskManager {
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
-        self.ready_queue.pop_front()
+        // find tcb with minimum stride in the ready queue
+        let min_stride_tcb = self
+            .ready_queue
+            .iter()
+            .map(|tcb| {
+                let stride = tcb.inner_exclusive_access().stride;
+                (tcb, stride)
+            })
+            .min_by_key(|&(_, stride)| stride)
+            .map(|(tcb, _)| Some(tcb.clone()))
+            .unwrap_or(None);
+
+        // remove the target tcb from the ready queue
+        if let Some(tcb) = min_stride_tcb {
+            let index = self
+                .ready_queue
+                .iter()
+                .position(|item| Arc::ptr_eq(item, &tcb));
+            if let Some(index) = index {
+                return self.ready_queue.remove(index);
+            }
+        }
+        None
     }
 }
 

@@ -7,6 +7,8 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
+use crate::config::BIG_STRIDE;
+use crate::mm::VirtPageNum;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
@@ -61,6 +63,10 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+
+            // when the task is scheduled, add pass value to stride
+            task_inner.stride += BIG_STRIDE / task_inner.priority;
+
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
@@ -108,4 +114,24 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
     }
+}
+
+/// allocate memory for current task
+pub fn mmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum, port: usize) -> isize {
+    let task = current_task().unwrap();
+    let code = task
+        .inner_exclusive_access()
+        .memory_set
+        .mmap(start_vpn, end_vpn, port);
+    code
+}
+
+/// free memory for current task
+pub fn munmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
+    let task = current_task().unwrap();
+    let code = task
+        .inner_exclusive_access()
+        .memory_set
+        .mumap(start_vpn, end_vpn);
+    code
 }

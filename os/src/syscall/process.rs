@@ -5,10 +5,10 @@ use alloc::sync::Arc;
 use crate::{
     config::MAX_SYSCALL_NUM,
     fs::{open_file, OpenFlags},
-    mm::{translate_ptr, translated_refmut, translated_str, VirtAddr, VirtPageNum},
+    mm::{translated_refmut, translated_str, VirtAddr, VirtPageNum},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next, mmap, munmap,
-        set_task_info, suspend_current_and_run_next, TaskControlBlock, TaskStatus,
+        suspend_current_and_run_next, TaskControlBlock, TaskStatus,
     },
     timer::get_time_us,
 };
@@ -24,11 +24,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    pub status: TaskStatus,
+    status: TaskStatus,
     /// The numbers of syscall called by task
-    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    pub time: usize,
+    time: usize,
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -135,14 +135,12 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!(
         "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    let kti = translate_ptr(current_user_token(), ti);
-    set_task_info(kti);
-    0
+    -1
 }
 
 /// YOUR JOB: Implement mmap.
@@ -236,13 +234,5 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    // if prio >= 2 {
-    //     let current_task = current_task().unwrap();
-    //     let mut inner = current_task.inner_exclusive_access();
-    //     inner.priority = prio as u32;
-    //     drop(inner);
-
-    //     return prio;
-    // }
     -1
 }

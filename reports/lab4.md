@@ -1,3 +1,23 @@
+### 1. 功能总结
+
+本次实验主要实现了三个系统调用`sys_linkat`、`sys_unlinkat`、`sys_stat`。
+
+硬链接的本质就是使两个不同名称的文件指向同一个inode，而inode对应文件所在的块的位置。主要步骤为：根据old_name查找出文件的inode，创建一个新的DirEntry记录new_name和这个inode，再存入root_inode中，而文件的查找都会经过root_inode。
+
+unlink和unlink的核心代码在INode已经写好，我做的主要是在os中封装一层接口，供系统调用函数使用，并额外增加了对link次数的统计功能。另外，在File特征中加入了get_stat方法，由OSInode实现，主要目的为获取DiskInode中的link_num值
+
+### 2. 问答题
+
+1.在我们的easy-fs中，root inode起着什么作用？如果root inode中的内容损坏了，会发生什么？
+
+所有的文件都存放在根目录下，所有的DirEntry信息都存储在root inode所对应的block中。而DirEntry记录了文件名与inode_id的关系，我们需要通过文件名来索引文件，就离不开root inode。所以查找、打开和创建文件时，均需要使用到root inode。
+
+如果root inode中的内容损耗坏，将无法判断文件是否已存在，在创建名称已存在的文件时，系统将不会进行内存回收，此时多个同名文件占据着多个inode资源，如果多次创建，将可能导致磁盘的空间不足。
+
+此外，系统也有可能读取到一些非法的数据。当查找某个文件时，因为root inode内容损坏（inode_id值变化），系统查找到了错误的inode_id，于是INode中记录着错误block_id，对应的block中可能存放了数据，也可能还未被分配，当通过OSInode去读或写数据的时候，就可能访问到非法的数据。
+
+### 3. 荣誉准则
+
 在完成本次实验的过程（含此前学习的过程）中，我曾分别与 以下各位 就（与本次实验相关的）以下方面做过交流，还在代码中对应的位置以注释形式记录了具体的交流对象及内容：
 
 《你交流的对象说明》

@@ -126,12 +126,12 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
 
 /// link
 pub fn link(old_name: &str, new_name: &str) -> isize {
-    let return_value = ROOT_INODE.link(old_name, new_name);
-    if return_value == 0 {
+    let status_code = ROOT_INODE.link(old_name, new_name);
+    if status_code == 0 {
         let inode = ROOT_INODE.find(old_name).unwrap();
         inode.link_inc();
     }
-    return_value
+    status_code
 }
 
 /// unlink

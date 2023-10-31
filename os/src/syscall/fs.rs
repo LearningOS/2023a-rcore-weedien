@@ -119,7 +119,6 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
         "kernel:pid[{}] sys_unlinkat NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    let token = current_user_token();
-    let name = translated_str(token, name);
+    let name = translated_str(current_user_token(), name);
     unlink(name.as_str())
 }

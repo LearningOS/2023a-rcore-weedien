@@ -203,8 +203,7 @@ pub fn sys_spawn(path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    let token = current_user_token();
-    let path = translated_str(token, path);
+    let path = translated_str(current_user_token(), path);
 
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let data = app_inode.read_all();

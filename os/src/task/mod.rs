@@ -94,6 +94,12 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     } else {
         drop(task);
     }
+
+    // mark this thread as finished
+    let mut process_inner = process.inner_exclusive_access();
+    process_inner.finished[tid] = true;
+    drop(process_inner);
+
     // however, if this is the main thread of current process
     // the process should terminate at once
     if tid == 0 {

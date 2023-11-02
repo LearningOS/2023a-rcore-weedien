@@ -198,21 +198,20 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
             .unwrap()
             .count();
 
-        // let is_safe = process_inner
-        //     .finished
-        //     .iter()
-        //     .enumerate()
-        //     .any(|(tid, &is_finish)| {
-        //         if is_finish {
-        //             false
-        //         } else {
-        //             process_inner.semaphore_need[tid]
-        //                 .iter()
-        //                 .skip(1)
-        //                 .all(|&need| need <= sem_count)
-        //         }
-        //     });
-        let is_safe = process_inner.semaphore_need[tid][sem_id] <= sem_count;
+        let is_safe = process_inner
+            .finished
+            .iter()
+            .enumerate()
+            .any(|(tid, &is_finish)| {
+                if is_finish {
+                    false
+                } else {
+                    process_inner.semaphore_need[tid]
+                        .iter()
+                        .skip(1)
+                        .all(|&need| need <= sem_count)
+                }
+            });
 
         if !is_safe {
             return -0xDEAD;
